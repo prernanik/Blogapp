@@ -15,7 +15,7 @@ const Comment = require('./comment');
 
 const app = express();
 
-const PORT = 2000;
+const PORT = process.env.PORT||2000;
  const cors = require('cors');
  app.use(cors());
  app.use(bodyparser.json())
