@@ -14,11 +14,40 @@ const Comment = require('./comment');
  const bodyparser=require('body-parser');
 
 const app = express();
+const CLIENT_ID = "841951628254-vpmk9jm18vmjluigis8b4g8h8lbtcl12.apps.googleusercontent.com";
+const REDIRECT_URI = 'https://blog-tool.onrender.com/callback/github'; 
+const SCOPES = 'user:email'; 
+
+
+app.get('/github-auth', (req, res) => {
+  
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${SCOPES}`;
+
+
+  res.redirect(githubAuthUrl);
+});
 
 const PORT = process.env.PORT||2000;
  const cors = require('cors');
  app.use(cors());
  app.use(bodyparser.json())
+
+ const { google } = require('googleapis');
+const OAuth2 = google.auth.OAuth2;
+
+const oauth2Client = new OAuth2(
+  '841951628254-vpmk9jm18vmjluigis8b4g8h8lbtcl12.apps.googleusercontent.com',
+  '"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"',
+  'https://blog-tool.onrender.com' // This should match one of the authorized redirect URIs in your Google Cloud Console project
+);
+
+// Generate the authorization URL
+const authUrl = oauth2Client.generateAuthUrl({
+  access_type: 'offline', // for refresh token
+  scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile', // the desired Google API scopes
+});
+
+console.log('Authorization URL:', authUrl);
  
 connectDB()
 
@@ -45,6 +74,7 @@ app.get("/api/get", async (req, res) => {
 app.post('/users/register',async (req,res)=>{
   try{
     const {username,email,password}=req.body;
+    console.log(username,email,password);
     // const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({ username,email, password,role : "USER" });
     console.log(user)
