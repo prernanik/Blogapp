@@ -1,11 +1,14 @@
-  
-
 const express = require('express');
 const {connectDB} =require('./db');
 const User = require('./user');
 const Post = require('./post');
 const Comment = require('./comment');
 // const bcrypt = require('bcrypt');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const session = require('express-session');
+
+
 
 
 
@@ -14,71 +17,50 @@ const Comment = require('./comment');
  const bodyparser=require('body-parser');
 
 const app = express();
-const CLIENT_ID = "841951628254-vpmk9jm18vmjluigis8b4g8h8lbtcl12.apps.googleusercontent.com";
-const REDIRECT_URI = 'https://blog-tool.onrender.com/callback/github'; 
-const SCOPES = 'user:email'; 
 
-
-app.get('/github-auth', (req, res) => {
-  
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${SCOPES}`;
-
-
-  res.redirect(githubAuthUrl);
-});
-
-const PORT = process.env.PORT||2000;
+const PORT = process.env.PORT || 4000;
  const cors = require('cors');
  app.use(cors());
  app.use(bodyparser.json())
-
- const { google } = require('googleapis');
-const OAuth2 = google.auth.OAuth2;
-
-const oauth2Client = new OAuth2(
-  '841951628254-vpmk9jm18vmjluigis8b4g8h8lbtcl12.apps.googleusercontent.com',
-  '"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"',
-  'https://blog-tool.onrender.com' // This should match one of the authorized redirect URIs in your Google Cloud Console project
-);
-
-// Generate the authorization URL
-const authUrl = oauth2Client.generateAuthUrl({
-  access_type: 'offline', // for refresh token
-  scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile', // the desired Google API scopes
-});
-
-console.log('Authorization URL:', authUrl);
  
 connectDB()
+const crypto = require('crypto');
+var userProfile;
+
+const sessionSecret = crypto.randomBytes(32).toString('hex');
+app.use(session({
+  secret: sessionSecret, 
+  resave: false,
+  saveUninitialized: true,
+}));
 
 
-app.get("/api/get", async (req, res) => {
-  
-    try {
-      const userId =req.query.userId
-      console.log(userId);
-        const post = await Post.find({author:userId})
-        console.log(post);
-         
-        res.json(post);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-  });
+app.use(passport.initialize());
+app.use(passport.session());
 
+passport.use(new GoogleStrategy({
+    clientID: '841951628254-vpmk9jm18vmjluigis8b4g8h8lbtcl12.apps.googleusercontent.com/',
+    clientSecret: "1349bceb97311c688d1e6c3ca95abb8fff031dec",
+    callbackURL: "https://blogapp-csk3.onrender.com/auth/google/callback"
+  },
+  function(accessToken, refreshToken, profile, done) {
+    userProfile=profile;
+    return done(null, userProfile);
+}
+));
 
-
-
-
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+passport.deserializeUser((obj, done) => {
+  done(null, obj);
+});
 app.post('/users/register',async (req,res)=>{
   try{
     const {username,email,password}=req.body;
-    console.log(username,email,password);
     // const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({ username,email, password,role : "USER" });
-    console.log(user)
-     await user.save();
+    await user.save();
     res.json(user)
   }catch{
     res.status(500).json({ error: 'Could not fetch user' });
@@ -88,7 +70,7 @@ app.post('/api/login',async (req,res)=>{
   const{username,password}=req.body;
   console.log(username,password);
   const user = await User.findOne({username,password});
-  console.log(user);
+  // console.log(user);
   if(user){
     res.status(200).json(user);
   }else{
@@ -98,15 +80,20 @@ app.post('/api/login',async (req,res)=>{
 app.post('/api/posts', async (req, res) => {
   try {
    
-    const { title,description,author} = req.body;
+    const { title, description, author } = req.body;
+    console.log(author);
+   
     
-    const newPost = new Post({ title, description,author}); 
+    const newPost = new Post({ title, description, author }); 
+    
+   ;
     await newPost.save();
-    const user =await User.findById(author);
-    if(user){
+    const user = await User.findById(author);
+    if (user) {
       user.posts.push(newPost.username);
       await user.save();
     }
+   
 
     res.status(201).json({ message: 'Post saved successfully' });
   } catch (error) {
@@ -114,5 +101,60 @@ app.post('/api/posts', async (req, res) => {
     res.status(500).json({ error: 'Failed to save post' });
   }
 });
+app.get('/api/posts', async (req, res) => {
+  try {
+    
+   
+    const userId = req.query.userId;
+    console.log(userId);
+
+    const posts = await Post.find({ author: userId });
+    console.log(posts);
+
+
+    res.status(200).json(posts);
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Failed to fetch user posts' });
+  }
+});
+app.post('/api/posts/:postId/like', async (req, res) => {
+  const postId = req.params.postId;
+  try {
+    const post = await Post.findById(postId);
+
+
+    if (!post) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    post.likes += 1;
+    await post.save();
+
+    res.status(200).json({ message: 'Like updated successfully', likes: post.likes });
+  } catch (error) {
+    console.error('Error updating like:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+  app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+  // app.get(
+  //   '/auth/google/callback',
+  //   passport.authenticate('google', {
+  //     successRedirect: '/MainPage', 
+  //     failureRedirect: '/error', 
+  //   })
+  // );
+  app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/error' }),
+  function(req, res) {
+    // Successful authentication, redirect success.
+    res.send(userProfile);
+  });
+
+
 
   app.listen(PORT,() => console.log(`Server running on port ${PORT}`))
