@@ -39,9 +39,9 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 passport.use(new GoogleStrategy({
-    clientID: '841951628254-vpmk9jm18vmjluigis8b4g8h8lbtcl12.apps.googleusercontent.com/',
-    clientSecret: "1349bceb97311c688d1e6c3ca95abb8fff031dec",
-    callbackURL: "https://blogapp-csk3.onrender.com/auth/google/callback"
+    clientID: '841951628254-vpmk9jm18vmjluigis8b4g8h8lbtcl12.apps.googleusercontent.com',
+    clientSecret: "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",
+    callbackURL: "https://blog-tool.onrender.com/auth/google/callback",
   },
   function(accessToken, refreshToken, profile, done) {
     userProfile=profile;
